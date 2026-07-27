@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Garmin FIT2 Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="brand-wrap">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img" aria-label="Garmin FIT2 Analyzer Logo">
+          <path d="M10 44 L24 20 L34 34 L44 14 L54 44" fill="none" stroke="currentColor" stroke-width="6"
+            stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </div>
+      <div>
+        <p class="eyebrow">Single-File Analyse</p>
+        <h1>Garmin FIT2 Analyzer</h1>
+      </div>
+    </div>
+    <button id="themeToggle" class="ghost-button" type="button" aria-label="Theme wechseln">Theme</button>
+  </header>
+
+  <main class="layout">
+    <!-- FIT-Datei laden -->
+    <section class="panel upload-panel">
+      <h2>FIT-Datei laden</h2>
+      <p class="muted">Lade eine einzelne Aktivität hoch und analysiere Metriken, Karte und Höhenprofil.</p>
+
+      <label for="fitFile" class="file-label">FIT-Datei auswählen</label>
+      <input id="fitFile" type="file" accept=".fit" />
+
+      <div class="button-row">
+        <button id="analyzeBtn" class="primary-button" type="button">Datei analysieren</button>
+        <button id="resetBtn" class="ghost-button" type="button">Zurücksetzen</button>
+      </div>
+
+      <div id="statusBox" class="status-box info">Noch keine Datei geladen.</div>
+    </section>
+
+    <!-- Überblick -->
+    <section class="panel summary-panel">
+      <h2>Überblick</h2>
+      <div class="metrics-grid" id="metricsGrid">
+        <article class="metric-card"><span>Startzeit</span><strong id="metricStart">–</strong></article>
+        <article class="metric-card"><span>Dauer</span><strong id="metricDuration">–</strong></article>
+        <article class="metric-card"><span>Distanz</span><strong id="metricDistance">–</strong></article>
+        <article class="metric-card"><span>Ø Geschwindigkeit</span><strong id="metricSpeed">–</strong></article>
+        <article class="metric-card"><span>Ø Herzfrequenz</span><strong id="metricHr">–</strong></article>
+        <article class="metric-card"><span>Ø Leistung</span><strong id="metricPower">–</strong></article>
+        <article class="metric-card"><span>Anstieg</span><strong id="metricAscent">–</strong></article>
+        <article class="metric-card"><span>Abstieg</span><strong id="metricDescent">–</strong></article>
+      </div>
+    </section>
+
+    <!-- Profil / Zonen -->
+    <section class="panel zones-panel">
+      <h2>Profil / Zonen</h2>
+      <div class="zones-mode-toggle">
+        <button class="zones-tab active" id="zoneTabSimple" type="button">Einfach (FTP + HFmax)</button>
+        <button class="zones-tab" id="zoneTabExpert" type="button">Experte</button>
+      </div>
+      <div id="zoneModeSimple">
+        <div class="zones-inputs">
+          <label>FTP (Watt) <input id="inputFtp" type="number" min="1" max="600" placeholder="z.B. 250" /></label>
+          <label>HFmax (bpm) <input id="inputHrMax" type="number" min="100" max="220" placeholder="z.B. 185" /></label>
+        </div>
+        <button id="calcZonesBtn" class="primary-button" type="button">Zonen berechnen</button>
+      </div>
+      <div id="zoneModeExpert" style="display:none">
+        <p class="muted">Leistungszonen (Watt) und Herzfrequenzzonen (bpm) direkt eingeben:</p>
+        <table class="zones-expert-table">
+          <thead><tr><th>Zone</th><th>Name</th><th>Leistung von</th><th>Leistung bis</th><th>HF von</th><th>HF bis</th></tr></thead>
+          <tbody id="zonesExpertBody"></tbody>
+        </table>
+        <button id="applyExpertZonesBtn" class="primary-button" type="button">Zonen übernehmen</button>
+      </div>
+      <div id="zonesPreview" style="display:none; margin-top:1rem;">
+        <h3>Aktive Zonen</h3>
+        <div id="zonesPreviewGrid" class="zones-preview-grid"></div>
+      </div>
+    </section>
+
+    <section class="panel max-mean-power-panel">
+      <h2>Beste Leistungen</h2>
+      <div id="maxMeanPowerPanel" class="metrics-grid">
+        <!-- wird von displayMaxMeanPower befüllt -->
+      </div>
+    </section>
+
+    <!-- Positions-Slider: eigenes Panel, volle Breite -->
+    <section class="panel position-panel">
+      <div class="position-inner">
+        <div class="position-slider-block">
+          <label for="positionIndex">Position:</label>
+          <input id="positionIndex" type="range" min="0" max="0" value="0" step="1">
+          <span id="positionLabel">0.00 km</span>
+        </div>
+
+        <!-- Werte-Bereich UNTER dem Slider -->
+        <div class="position-metrics">
+          <span>Herzfrequenz: <strong id="pointHr">–</strong></span>
+          <span>Höhe: <strong id="pointAltitude">–</strong></span>
+          <span>Geschwindigkeit: <strong id="pointSpeed">–</strong></span>
+          <span>Leistung: <strong id="pointPower">–</strong></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Karte + Höhenprofil -->
+    <section class="split-panel" aria-label="Karte und Höhenprofil">
+      <div class="panel map-panel split-left">
+        <div class="panel-header">
+          <h2>Karte</h2>
+          <div class="header-button-group">
+            <button id="mapCenterToggle" class="ghost-button ghost-button-small" type="button">
+              Training zentrieren
+            </button>
+            <button id="mapExpandToggle" class="ghost-button ghost-button-small" type="button">
+              Karte vergrößern
+            </button>
+          </div>
+        </div>
+
+        <div id="map"></div>
+      </div>
+
+      <div id="splitHandle" class="split-handle" role="separator" aria-orientation="vertical"
+        aria-label="Breite zwischen Karte und Höhenprofil anpassen"></div>
+
+      <div class="panel chart-panel split-right">
+        <h2>Höhenprofil</h2>
+        <div class="chart-wrap">
+          <canvas id="altitudeChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bereichsanalyse -->
+    <section class="panel range-panel" id="rangePanel" style="display:none;">
+      <h2>Bereichsanalyse</h2>
+
+      <div class="range-slider-wrap">
+        <div class="range-labels">
+          <span id="rangeFromLabel">Von: 0.00 km</span>
+          <span id="rangeToLabel">Bis: 0.00 km</span>
+        </div>
+
+        <div class="range-track-wrapper">
+          <div class="range-track"></div>
+          <div id="rangeTrackFill" class="range-track-fill"></div>
+          <!-- Overlay für Drag des gesamten Bereichs -->
+          <div id="rangeDragOverlay" class="range-drag-overlay" title="Bereich verschieben"></div>
+
+          <input id="rangeFrom" type="range" min="0" max="0" step="1" value="0" aria-label="Bereich von" />
+
+          <input id="rangeTo" type="range" min="0" max="0" step="1" value="0" aria-label="Bereich bis" />
+        </div>
+      </div>
+
+      <div class="range-metrics-grid" id="rangeMetricsGrid">
+        <article class="metric-card"><span>Zeit</span><strong id="rangeDuration">–</strong></article>
+        <article class="metric-card"><span>Distanz</span><strong id="rangeDistance">–</strong></article>
+        <article class="metric-card"><span>Ø Geschwindigkeit</span><strong id="rangeSpeed">–</strong></article>
+        <article class="metric-card"><span>Ø Herzfrequenz</span><strong id="rangeHr">–</strong></article>
+        <article class="metric-card"><span>Anstieg</span><strong id="rangeAscent">–</strong></article>
+        <article class="metric-card"><span>Abstieg</span><strong id="rangeDescent">–</strong></article>
+        <article class="metric-card"><span>Ø Leistung</span><strong id="rangePower">–</strong></article>
+        <article class="metric-card"><span>Ø Kadenz</span><strong id="rangeCadence">–</strong></article>
+      </div>
+
+      <h3 style="margin-top: 1.5rem; margin-bottom: 0.5rem;">Beste Leistungen (Bereich)</h3>
+      <div id="rangeMaxMeanPowerPanel" class="metrics-grid range-mmp-grid">
+        <!-- wird von displayRangeMaxMeanPower befüllt -->
+      </div>
+
+      <h3 style="margin-top: 1.5rem; margin-bottom: 0.5rem;">Zonenanalyse (Bereich)</h3>
+      <div id="rangeZoneAnalysis">
+        <p class="muted">Bitte erst Zonen im Panel "Profil / Zonen" definieren.</p>
+      </div>
+    </section>
+
+
+
+    <!-- Detailwerte -->
+    <section class="panel details-panel">
+      <h2>Detailwerte</h2>
+      <table>
+        <tbody>
+          <tr>
+            <td>Dateiname</td>
+            <td id="detailFileName">–</td>
+          </tr>
+          <tr>
+            <td>Punkte</td>
+            <td id="detailPoints">–</td>
+          </tr>
+          <tr>
+            <td>GPS vorhanden</td>
+            <td id="detailGps">–</td>
+          </tr>
+          <tr>
+            <td>Power vorhanden</td>
+            <td id="detailPowerAvailable">–</td>
+          </tr>
+          <tr>
+            <td>Herzfrequenz vorhanden</td>
+            <td id="detailHrAvailable">–</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" src="./src/app.js"></script>
+</body
