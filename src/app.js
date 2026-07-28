@@ -75,6 +75,7 @@ const fields = {
   metricSpeed: document.getElementById('metricSpeed'),
   metricHr: document.getElementById('metricHr'),
   metricPower: document.getElementById('metricPower'),
+  metricNP: document.getElementById('metricNP'),
   metricAscent: document.getElementById('metricAscent'),
   metricDescent: document.getElementById('metricDescent'),
   detailFileName: document.getElementById('detailFileName'),
@@ -244,6 +245,7 @@ function renderSummary(fileName, summary) {
   fields.metricSpeed.textContent = formatSpeed(summary.avgSpeed);
   fields.metricHr.textContent = formatNumber(summary.avgHeartRate, 0, 'bpm');
   fields.metricPower.textContent = formatNumber(summary.avgPower, 0, 'W');
+  fields.metricNP.textContent = formatNumber(summary.normalizedPower, 0, 'W');
   fields.metricAscent.textContent = formatNumber(summary.totalAscent, 0, 'm');
   fields.metricDescent.textContent = formatNumber(summary.totalDescent, 0, 'm');
   fields.detailFileName.textContent = fileName;

@@ -11,6 +11,7 @@ export function summarizeActivity(data) {
 
   const avgHeartRate = average(validRecords.map(r => toFinite(r.heart_rate)));
   const avgPower = average(validRecords.map(r => toFinite(r.power)));
+  const normalizedPower = computeNormalizedPower(validRecords);
   const avgSpeed = durationSeconds > 0 ? distanceMeters / durationSeconds : average(validRecords.map(r => toFinite(r.speed)));
 
   const { ascent, descent } = computeElevationGain(validRecords);
@@ -22,6 +23,7 @@ export function summarizeActivity(data) {
     avgSpeed: Number.isFinite(avgSpeed) ? avgSpeed : null,
     avgHeartRate: Number.isFinite(avgHeartRate) ? avgHeartRate : null,
     avgPower: Number.isFinite(avgPower) ? avgPower : null,
+    normalizedPower: Number.isFinite(normalizedPower) ? normalizedPower : null,
     totalAscent: ascent,
     totalDescent: descent,
     recordCount: validRecords.length,
@@ -179,6 +181,24 @@ function computeElevationGain(records) {
     ascent: Math.round(ascent),
     descent: Math.round(descent)
   };
+}
+
+export function computeNormalizedPower(records) {
+  // NP = 4th root of the average of 30s rolling average power^4
+  const list = (records || []).filter(r => r && Number.isFinite(r.power));
+  if (list.length < 30) return null;
+
+  const windowSize = 30;
+  const smoothed = [];
+  for (let i = windowSize - 1; i < list.length; i++) {
+    const slice = list.slice(i - windowSize + 1, i + 1);
+    const avg = slice.reduce((s, r) => s + r.power, 0) / windowSize;
+    smoothed.push(avg);
+  }
+  if (!smoothed.length) return null;
+
+  const mean4th = smoothed.reduce((s, v) => s + Math.pow(v, 4), 0) / smoothed.length;
+  return Math.round(Math.pow(mean4th, 0.25));
 }
 
 function average(values) {
